@@ -1,0 +1,7 @@
+.git
+bin
+.dockerignore
+compose.yml
+Makefile
+README.md
+.env
