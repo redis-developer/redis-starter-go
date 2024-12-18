@@ -13,6 +13,10 @@ type TodosService struct {
 func formatId(id string) (string, error) {
 	matched, err := regexp.Match(`^todos:`, []byte(id))
 
+  if err != nil {
+    return id, fmt.Errorf("Failed to format id: %w", err)
+  }
+
 	if matched {
 		return id, err
 	}
@@ -57,7 +61,7 @@ func (c TodosService) Update(ctx context.Context, id string, status string) (*To
 	}
 
 	if !ok {
-		return nil, fmt.Errorf("Invalid status")
+		return nil, fmt.Errorf("Invalid status %s", status)
 	}
 
 	return c.repository.Update(ctx, normalizedId, todoStatus)

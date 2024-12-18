@@ -56,6 +56,10 @@ func (c TodosRepository) CreateIndexIfNotExists(ctx context.Context) error {
 		},
 	).Result()
 
+  if err != nil {
+    return fmt.Errorf("Failed to create index: %w", err)
+  }
+
 	return err
 }
 
@@ -86,7 +90,7 @@ func (c TodosRepository) One(ctx context.Context, id string) (*Todo, error) {
 	todoStr, err := c.db.JSONGet(ctx, id).Result()
 
 	if err != nil {
-		return nil, err
+    return nil, fmt.Errorf("Failed JSON.GET for todo: %w", err)
 	}
 
 	todo := parseTodoStr(id, todoStr)
@@ -111,6 +115,10 @@ func (c TodosRepository) Search(ctx context.Context, name string, status string)
 	log.Println(searches)
 
 	todosResult, err := c.db.FTSearch(ctx, TodosIndex, strings.Join(searches, " ")).Result()
+
+  if err != nil {
+    return nil, fmt.Errorf("Failed FT.SEARCH for todos: %w", err)
+  }
 
 	var documents = []Todo{}
 
@@ -138,7 +146,7 @@ func (c TodosRepository) Create(ctx context.Context, id string, name string) (*T
   _, err := c.db.JSONSet(ctx, id, "$", todo).Result();
 
   if err != nil {
-    return nil, err
+    return nil, fmt.Errorf("Failed JSON.SET for todo: %w", err)
   }
 
   return todo, nil
@@ -148,7 +156,7 @@ func (c TodosRepository) Update(ctx context.Context, id string, status TodoStatu
   todo, err := c.One(ctx, id)
 
   if err != nil {
-    return nil, err
+    return nil, fmt.Errorf("Failed to update todo, not found: %w", err)
   }
 
   todo.Status = status
@@ -157,7 +165,7 @@ func (c TodosRepository) Update(ctx context.Context, id string, status TodoStatu
   _, err = c.db.JSONSet(ctx, id, "$", todo).Result();
 
   if err != nil {
-    return nil, err
+    return nil, fmt.Errorf("Failed JSON.SET for todo: %w", err)
   }
 
   return todo, nil
@@ -173,14 +181,14 @@ func (c TodosRepository) DelAll(ctx context.Context) error {
   allTodos, err := c.All(ctx)
 
   if err != nil {
-    return err
+    return fmt.Errorf("Failed to find all todos: %w", err)
   }
 
   for _, todo := range(allTodos.Documents) {
     err = c.Del(ctx, todo.ID)
 
     if err != nil {
-      return err
+      return fmt.Errorf("Failed to delete todo: %w", err)
     }
   }
 

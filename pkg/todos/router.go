@@ -1,6 +1,7 @@
 package todos
 
 import (
+  "log/slog"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -16,7 +17,8 @@ func (c Router) All(ctx echo.Context) error {
   todos, err := c.service.All(rCtx)
 
 	if err != nil {
-		return ctx.String(http.StatusNotFound, err.Error())
+    slog.Debug(err.Error())
+		return ctx.String(http.StatusNotFound, "Not found")
 	}
 
 	return ctx.JSON(http.StatusOK, todos)
@@ -29,7 +31,8 @@ func (c Router) Search(ctx echo.Context) error {
   todos, err := c.service.Search(rCtx, name, status)
 
   if err != nil {
-    return ctx.String(http.StatusNotFound, err.Error())
+    slog.Debug(err.Error())
+    return ctx.String(http.StatusNotFound, "Not found")
   }
 
   return ctx.JSON(http.StatusOK, todos)
@@ -41,7 +44,8 @@ func (c Router) One(ctx echo.Context) error {
 	todo, err := c.service.One(rCtx, id)
 
 	if err != nil {
-		return ctx.String(http.StatusNotFound, err.Error())
+		slog.Debug(err.Error())
+    return ctx.String(http.StatusNotFound, "Not found")
 	}
 
 	return ctx.JSON(http.StatusOK, todo)
@@ -56,14 +60,16 @@ func (c Router) Create(ctx echo.Context) error {
   t := new(CreateTodoDTO)
 
   if err := ctx.Bind(t); err != nil {
-    return ctx.String(http.StatusBadRequest, "bad request")
+    slog.Debug(err.Error())
+    return ctx.String(http.StatusBadRequest, "Bad request")
   }
 
 	rCtx := ctx.Request().Context()
   todo, err := c.service.Create(rCtx, t.ID, t.Name)
 
   if err != nil {
-    return ctx.String(http.StatusBadRequest, "bad request, todo not created")
+    slog.Debug(err.Error())
+    return ctx.String(http.StatusBadRequest, "Bad request, todo not created")
   }
 
   return ctx.JSON(http.StatusOK, todo)
@@ -77,7 +83,8 @@ func (c Router) Update(ctx echo.Context) error {
   t := new(UpdateTodoDTO)
 
   if err := ctx.Bind(t); err != nil {
-    return ctx.String(http.StatusBadRequest, "bad request")
+    slog.Debug(err.Error())
+    return ctx.String(http.StatusBadRequest, "Bad request")
   }
 
 	rCtx := ctx.Request().Context()
@@ -85,7 +92,8 @@ func (c Router) Update(ctx echo.Context) error {
   todo, err := c.service.Update(rCtx, id, t.Status)
 
   if err != nil {
-    return ctx.String(http.StatusNotFound, err.Error())
+    slog.Debug(err.Error())
+    return ctx.String(http.StatusNotFound, "Not found")
   }
 
   return ctx.JSON(http.StatusOK, todo)
@@ -98,7 +106,8 @@ func (c Router) Del(ctx echo.Context) error {
   err := c.service.Del(rCtx, id)
 
   if err != nil {
-    return ctx.String(http.StatusBadRequest, err.Error())
+    slog.Debug(err.Error())
+    return ctx.String(http.StatusBadRequest, "Not found")
   }
 
   return ctx.String(http.StatusOK, "OK")
