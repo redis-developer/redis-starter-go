@@ -56,9 +56,9 @@ func (c TodosRepository) CreateIndexIfNotExists(ctx context.Context) error {
 		},
 	).Result()
 
-  if err != nil {
-    return fmt.Errorf("Failed to create index: %w", err)
-  }
+	if err != nil {
+		return fmt.Errorf("Failed to create index: %w", err)
+	}
 
 	return err
 }
@@ -90,7 +90,7 @@ func (c TodosRepository) One(ctx context.Context, id string) (*Todo, error) {
 	todoStr, err := c.db.JSONGet(ctx, id).Result()
 
 	if err != nil {
-    return nil, fmt.Errorf("Failed JSON.GET for todo: %w", err)
+		return nil, fmt.Errorf("Failed JSON.GET for todo: %w", err)
 	}
 
 	todo := parseTodoStr(id, todoStr)
@@ -98,7 +98,10 @@ func (c TodosRepository) One(ctx context.Context, id string) (*Todo, error) {
 	return &todo, err
 }
 
-func (c TodosRepository) Search(ctx context.Context, name string, status string) (*Todos, error) {
+func (c TodosRepository) Search(
+	ctx context.Context,
+	name string,
+	status string) (*Todos, error) {
 	var searches []string
 
 	log.Println(name)
@@ -114,11 +117,15 @@ func (c TodosRepository) Search(ctx context.Context, name string, status string)
 
 	log.Println(searches)
 
-	todosResult, err := c.db.FTSearch(ctx, TodosIndex, strings.Join(searches, " ")).Result()
+	todosResult, err := c.db.FTSearch(
+		ctx,
+		TodosIndex,
+		strings.Join(searches, " "),
+	).Result()
 
-  if err != nil {
-    return nil, fmt.Errorf("Failed FT.SEARCH for todos: %w", err)
-  }
+	if err != nil {
+		return nil, fmt.Errorf("Failed FT.SEARCH for todos: %w", err)
+	}
 
 	var documents = []Todo{}
 
@@ -132,67 +139,73 @@ func (c TodosRepository) Search(ctx context.Context, name string, status string)
 	}, err
 }
 
-func (c TodosRepository) Create(ctx context.Context, id string, name string) (*Todo, error) {
+func (c TodosRepository) Create(
+	ctx context.Context,
+	id string,
+	name string) (*Todo, error) {
 	now := time.Now()
 
-  todo := &Todo{
-    ID: id,
-    Name: name,
-    Status: NotStarted,
-    CreatedDate: now,
-    UpdatedDate: now,
-  }
+	todo := &Todo{
+		ID:          id,
+		Name:        name,
+		Status:      NotStarted,
+		CreatedDate: now,
+		UpdatedDate: now,
+	}
 
-  _, err := c.db.JSONSet(ctx, id, "$", todo).Result();
+	_, err := c.db.JSONSet(ctx, id, "$", todo).Result()
 
-  if err != nil {
-    return nil, fmt.Errorf("Failed JSON.SET for todo: %w", err)
-  }
+	if err != nil {
+		return nil, fmt.Errorf("Failed JSON.SET for todo: %w", err)
+	}
 
-  return todo, nil
+	return todo, nil
 }
 
-func (c TodosRepository) Update(ctx context.Context, id string, status TodoStatus) (*Todo, error) {
-  todo, err := c.One(ctx, id)
+func (c TodosRepository) Update(
+	ctx context.Context,
+	id string,
+	status TodoStatus) (*Todo, error) {
+	todo, err := c.One(ctx, id)
 
-  if err != nil {
-    return nil, fmt.Errorf("Failed to update todo, not found: %w", err)
-  }
+	if err != nil {
+		return nil, fmt.Errorf("Failed to update todo, not found: %w", err)
+	}
 
-  todo.Status = status
-  todo.UpdatedDate = time.Now()
+	todo.Status = status
+	todo.UpdatedDate = time.Now()
 
-  _, err = c.db.JSONSet(ctx, id, "$", todo).Result();
+	_, err = c.db.JSONSet(ctx, id, "$", todo).Result()
 
-  if err != nil {
-    return nil, fmt.Errorf("Failed JSON.SET for todo: %w", err)
-  }
+	if err != nil {
+		return nil, fmt.Errorf("Failed JSON.SET for todo: %w", err)
+	}
 
-  return todo, nil
+	return todo, nil
 }
 
 func (c TodosRepository) Del(ctx context.Context, id string) error {
-  _, err := c.db.JSONDel(ctx, id, "$").Result()
+	_, err := c.db.JSONDel(ctx, id, "$").Result()
 
-  return err
+	return err
 }
 
 func (c TodosRepository) DelAll(ctx context.Context) error {
-  allTodos, err := c.All(ctx)
+	allTodos, err := c.All(ctx)
 
-  if err != nil {
-    return fmt.Errorf("Failed to find all todos: %w", err)
-  }
+	if err != nil {
+		return fmt.Errorf("Failed to find all todos: %w", err)
+	}
 
-  for _, todo := range(allTodos.Documents) {
-    err = c.Del(ctx, todo.ID)
+	for _, todo := range allTodos.Documents {
+		err = c.Del(ctx, todo.ID)
 
-    if err != nil {
-      return fmt.Errorf("Failed to delete todo: %w", err)
-    }
-  }
+		if err != nil {
+			return fmt.Errorf("Failed to delete todo: %w", err)
+		}
+	}
 
-  return nil
+	return nil
 }
 
 func NewRepository(db *redis.Client) *TodosRepository {

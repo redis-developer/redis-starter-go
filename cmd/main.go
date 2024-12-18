@@ -13,7 +13,8 @@ func main() {
 	err := godotenv.Load()
 
 	if err != nil {
-    log.Println("failed to load environment file, assuming environment variables are already loaded")
+		log.Println("failed to load environment file, " +
+			"assuming environment variables are already loaded")
 	}
 
 	server := api.NewServer(&config.Config{})

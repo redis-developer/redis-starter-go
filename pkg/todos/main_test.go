@@ -33,8 +33,11 @@ func TestCrud(t *testing.T) {
 			return
 		}
 
-		if todo.Name != name || todo.ID != fmt.Sprintf("todos:%s", id) {
-			t.Errorf("got id:%s name:%s, want id:%s name:%s", todo.ID, todo.Name, id, name)
+		if todo.Name != name ||
+			todo.ID != fmt.Sprintf("todos:%s", id) ||
+			todo.Status != "todo" {
+			t.Errorf("got id:%s name:%s status:%s, want id:%s name:%s status:%s",
+				todo.ID, todo.Name, todo.Status, id, name, "todo")
 		}
 	})
 }

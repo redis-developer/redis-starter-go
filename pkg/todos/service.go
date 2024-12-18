@@ -28,7 +28,10 @@ func (c TodosService) All(ctx context.Context) (*Todos, error) {
 	return c.repository.All(ctx)
 }
 
-func (c TodosService) Search(ctx context.Context, name string, status string) (*Todos, error) {
+func (c TodosService) Search(
+  ctx context.Context,
+  name string,
+  status string) (*Todos, error) {
 	return c.repository.Search(ctx, name, status)
 }
 
@@ -42,7 +45,10 @@ func (c TodosService) One(ctx context.Context, id string) (*Todo, error) {
 	return c.repository.One(ctx, normalizedId)
 }
 
-func (c TodosService) Create(ctx context.Context, id string, name string) (*Todo, error) {
+func (c TodosService) Create(
+  ctx context.Context,
+  id string,
+  name string) (*Todo, error) {
 	normalizedId, err := formatId(id)
 
 	if err != nil {
@@ -52,7 +58,10 @@ func (c TodosService) Create(ctx context.Context, id string, name string) (*Todo
 	return c.repository.Create(ctx, normalizedId, name)
 }
 
-func (c TodosService) Update(ctx context.Context, id string, status string) (*Todo, error) {
+func (c TodosService) Update(
+  ctx context.Context,
+  id string,
+  status string) (*Todo, error) {
 	normalizedId, err := formatId(id)
 	todoStatus, ok := TodoStatusMap[status]
 

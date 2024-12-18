@@ -36,7 +36,8 @@ func (s *Server) Run() {
 		}
 	}()
 
-	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 10 seconds.
+	// Wait for interrupt signal to gracefully shutdown the server with a timeout
+	// of 10 seconds.
 	<-ctx.Done()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -56,12 +57,15 @@ func NewServer(config Config) *Server {
 
 	e.Pre(middleware.RemoveTrailingSlash())
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
-		Format: "${time_rfc3339} ${status} ${method} ${uri} ${latency_human} [${user_agent} ${remote_ip}]\n",
+		Format: "${time_rfc3339} ${status} ${method} ${uri} ${latency_human} " +
+			"[${user_agent} ${remote_ip}]\n",
 	}))
 	e.Use(middleware.Recover())
 
 	apiGroup := e.Group("/api")
-	apiGroup.RouteNotFound("/*", func(c echo.Context) error { return c.NoContent(http.StatusNotFound) })
+	apiGroup.RouteNotFound("/*", func(c echo.Context) error {
+		return c.NoContent(http.StatusNotFound)
+	})
 
 	todos.NewComponent(apiGroup.Group("/todos"), database)
 
