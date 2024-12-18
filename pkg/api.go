@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,24 +15,24 @@ import (
 )
 
 type Config interface {
-  REDIS_URL() string
-  PORT() string
+	REDIS_URL() string
+	PORT() string
 }
 
 type Server struct {
-  port string
-  e    *echo.Echo
+	port string
+	e    *echo.Echo
 }
 
 func (s *Server) Run() {
-  e := s.e
+	e := s.e
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	// Start server
 	go func() {
 		if err := e.Start(":" + s.port); err != nil && err != http.ErrServerClosed {
-			e.Logger.Fatal("shutting down the server")
+			e.Logger.Fatal(fmt.Sprintf("Port %s in use: server won't start", s.port))
 		}
 	}()
 
@@ -62,8 +63,7 @@ func NewServer(config Config) *Server {
 	apiGroup := e.Group("/api")
 	apiGroup.RouteNotFound("/*", func(c echo.Context) error { return c.NoContent(http.StatusNotFound) })
 
-  todos.NewComponent(apiGroup.Group("/todos"), database)
+	todos.NewComponent(apiGroup.Group("/todos"), database)
 
 	return server
 }
-

@@ -11,6 +11,9 @@ func GetClient(url string) *redis.Client {
 		panic(err)
 	}
 
+  // opt.UnstableResp3 = true
+  opt.Protocol = 2
+
 	client := redis.NewClient(opt)
 
   return client
