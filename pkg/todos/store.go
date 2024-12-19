@@ -244,7 +244,7 @@ func (c store) Update(
 	todoStatus, ok := TodoStatusMap[status]
 
 	if !ok {
-		return nil, fmt.Errorf("Invalid status %s", todoStatus)
+		return nil, fmt.Errorf("invalid status %s", todoStatus)
 	}
 
 	todo, err := c.One(ctx, fId)
