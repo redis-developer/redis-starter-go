@@ -2,22 +2,18 @@ package todos
 
 import (
 	"context"
-	"fmt"
-	"slices"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/redis-developer/redis-starter-go/cmd/config"
 	"github.com/redis-developer/redis-starter-go/pkg/redis"
+	"github.com/stretchr/testify/assert"
 )
 
-func printTodo(todo *Todo) string {
-	return fmt.Sprintf("id:%s name:%s status:%s", todo.ID, todo.Name, todo.Status)
-}
-
-func todosEqual(t1 *Todo, t2 *Todo) bool {
-	return t1.ID == t2.ID && t1.Name == t2.Name && t1.Status == t2.Status
+func todosEqual(t *testing.T, expected *Todo, actual *Todo) {
+	assert.Equal(t, expected.ID, actual.ID)
+	assert.Equal(t, expected.Name, actual.Name)
+	assert.Equal(t, expected.Status, actual.Status)
 }
 
 func TestCrud(t *testing.T) {
@@ -38,52 +34,30 @@ func TestCrud(t *testing.T) {
 		sampleTodo := &Todo{
 			Name:   "Take out the trash",
 			ID:     "todos:abc123",
-			Status: "todo",
+			Status: NotStarted,
 		}
 		todo, err := store.Create(ctx, sampleTodo.ID, sampleTodo.Name)
 
-		if err != nil {
-			t.Errorf("todo not created: %s", err.Error())
-			return
-		}
-
-		if !todosEqual(todo, sampleTodo) {
-			t.Errorf("got %s, want %s", printTodo(todo), printTodo(sampleTodo))
-			return
+		if assert.NoErrorf(t, err, "todo not created: %s", "formatted") {
+			todosEqual(t, sampleTodo, todo)
 		}
 
 		readResult, err := store.One(ctx, todo.ID)
 
-		if err != nil {
-			t.Errorf("todo not read: %s", err.Error())
-			return
-		}
-
-		if !todosEqual(readResult, todo) {
-			t.Errorf("got %s, want %s", printTodo(readResult), printTodo(todo))
-			return
+		if assert.NoErrorf(t, err, "todo not read: %s", "formatted") {
+			todosEqual(t, todo, readResult)
 		}
 
 		updateResult, err := store.Update(ctx, sampleTodo.ID, "complete")
 
-		if err != nil {
-			t.Errorf("todo not updated: %s", err.Error())
-			return
+		if assert.NoErrorf(t, err, "todo not updated: %s", "formatted") {
+			assert.Equal(t, Complete, updateResult.Status)
+			assert.True(t, updateResult.CreatedDate.Before(updateResult.UpdatedDate))
 		}
 
-		if updateResult.Status != "complete" {
-			t.Errorf("got status:%s, want status:%s", updateResult.Status, "complete")
-			return
-		}
+		err = store.Del(ctx, updateResult.ID)
 
-		if updateResult.CreatedDate.After(updateResult.UpdatedDate) {
-			t.Errorf("got updated_date:%s, want after:%s",
-				updateResult.UpdatedDate.Format(time.RFC3339),
-				updateResult.CreatedDate.Format(time.RFC3339))
-			return
-		}
-
-		store.Del(ctx, updateResult.ID)
+		assert.NoErrorf(t, err, "todo not deleted: %s", "formatted")
 	})
 
 	t.Run("Create and read multiple todos", func(t *testing.T) {
@@ -96,29 +70,18 @@ func TestCrud(t *testing.T) {
 		for idx, todo := range todos {
 			_, err := store.Create(ctx, strconv.Itoa(idx), todo)
 
-			if err != nil {
-				t.Errorf("error creating todo: %s", err.Error())
-				return
-			}
+			assert.NoErrorf(t, err, "error creating todo: %s", "formatted")
 		}
 
 		allTodos, err := store.All(ctx)
 
-		if err != nil {
-			t.Errorf("error getting all todos: %s", err.Error())
-			return
+		if assert.NoErrorf(t, err, "error getting all todos: %s", "formatted") {
+			assert.Equal(t, len(todos), len(allTodos.Documents))
+			assert.True(t, len(allTodos.Documents) == int(allTodos.Total))
 		}
 
-		if len(allTodos.Documents) != int(allTodos.Total) || len(allTodos.Documents) != len(todos) {
-			t.Errorf("got len(Documents):%d total:%d, want len:%d", len(allTodos.Documents), allTodos.Total, len(todos))
-			return
-		}
-
-		for idx, todo := range allTodos.Documents {
-			if !slices.Contains(todos, todo.Name) {
-				t.Errorf("allTodos[%d].Name:%s not found in todos", idx, todo.Name)
-				return
-			}
+		for _, todo := range allTodos.Documents {
+			assert.Contains(t, todos, todo.Name)
 		}
 	})
 }
