@@ -8,17 +8,17 @@ import (
 )
 
 type Router struct {
-	service Service
+	store TodoStore
 }
 
 func (c Router) All(ctx echo.Context) error {
 	rCtx := ctx.Request().Context()
 
-	todos, err := c.service.All(rCtx)
+	todos, err := c.store.All(rCtx)
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusNotFound, "Not found")
+		return ctx.String(http.StatusNotFound, "not found")
 	}
 
 	return ctx.JSON(http.StatusOK, todos)
@@ -28,11 +28,11 @@ func (c Router) Search(ctx echo.Context) error {
 	rCtx := ctx.Request().Context()
 	name := ctx.QueryParam("name")
 	status := ctx.QueryParam("status")
-	todos, err := c.service.Search(rCtx, name, status)
+	todos, err := c.store.Search(rCtx, name, status)
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusNotFound, "Not found")
+		return ctx.String(http.StatusNotFound, "not found")
 	}
 
 	return ctx.JSON(http.StatusOK, todos)
@@ -41,11 +41,11 @@ func (c Router) Search(ctx echo.Context) error {
 func (c Router) One(ctx echo.Context) error {
 	rCtx := ctx.Request().Context()
 	id := ctx.Param("id")
-	todo, err := c.service.One(rCtx, id)
+	todo, err := c.store.One(rCtx, id)
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusNotFound, "Not found")
+		return ctx.String(http.StatusNotFound, "not found")
 	}
 
 	return ctx.JSON(http.StatusOK, todo)
@@ -61,15 +61,15 @@ func (c Router) Create(ctx echo.Context) error {
 
 	if err := ctx.Bind(t); err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusBadRequest, "Bad request")
+		return ctx.String(http.StatusBadRequest, "bad request")
 	}
 
 	rCtx := ctx.Request().Context()
-	todo, err := c.service.Create(rCtx, t.ID, t.Name)
+	todo, err := c.store.Create(rCtx, t.ID, t.Name)
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusBadRequest, "Bad request, todo not created")
+		return ctx.String(http.StatusBadRequest, "bad request, todo not created")
 	}
 
 	return ctx.JSON(http.StatusOK, todo)
@@ -84,16 +84,16 @@ func (c Router) Update(ctx echo.Context) error {
 
 	if err := ctx.Bind(t); err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusBadRequest, "Bad request")
+		return ctx.String(http.StatusBadRequest, "bad request")
 	}
 
 	rCtx := ctx.Request().Context()
 	id := ctx.Param("id")
-	todo, err := c.service.Update(rCtx, id, t.Status)
+	todo, err := c.store.Update(rCtx, id, t.Status)
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusNotFound, "Not found")
+		return ctx.String(http.StatusNotFound, "not found")
 	}
 
 	return ctx.JSON(http.StatusOK, todo)
@@ -103,18 +103,18 @@ func (c Router) Del(ctx echo.Context) error {
 	rCtx := ctx.Request().Context()
 	id := ctx.Param("id")
 
-	err := c.service.Del(rCtx, id)
+	err := c.store.Del(rCtx, id)
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusBadRequest, "Not found")
+		return ctx.String(http.StatusBadRequest, "not found")
 	}
 
-	return ctx.String(http.StatusOK, "OK")
+	return ctx.String(http.StatusOK, "ok")
 }
 
-func NewRouter(g *echo.Group, service Service) *Router {
-	router := &Router{service: service}
+func NewRouter(g *echo.Group, store TodoStore) *Router {
+	router := &Router{store: store}
 
 	g.GET("", router.All)
 	g.GET("/:id", router.One)

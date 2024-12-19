@@ -21,15 +21,14 @@ func todosEqual(t1 *Todo, t2 *Todo) bool {
 func TestCrud(t *testing.T) {
 	cfg := config.Config{}
 	database := redis.GetClient(cfg.REDIS_URL())
-	repository := NewRepository(database)
-	service := NewService(repository)
+	store := NewStore(database)
 	ctx := context.Background()
-	repository.CreateIndexIfNotExists(ctx)
+	store.CreateIndexIfNotExists(ctx)
 
 	t.Cleanup(func() {
-		repository.DelAll(ctx)
-		repository.DropIndex(ctx)
-		repository.CreateIndexIfNotExists(ctx)
+		store.DelAll(ctx)
+		store.DropIndex(ctx)
+		store.CreateIndexIfNotExists(ctx)
 	})
 
 	t.Run("CRUD for a single todo", func(t *testing.T) {
@@ -38,7 +37,7 @@ func TestCrud(t *testing.T) {
 			ID:     "todos:abc123",
 			Status: "todo",
 		}
-		todo, err := service.Create(ctx, sampleTodo.ID, sampleTodo.Name)
+		todo, err := store.Create(ctx, sampleTodo.ID, sampleTodo.Name)
 
 		if err != nil {
 			t.Errorf("todo not created: %s", err.Error())
@@ -50,7 +49,7 @@ func TestCrud(t *testing.T) {
 			return
 		}
 
-		readResult, err := service.One(ctx, todo.ID)
+		readResult, err := store.One(ctx, todo.ID)
 
 		if err != nil {
 			t.Errorf("todo not read: %s", err.Error())
@@ -62,7 +61,7 @@ func TestCrud(t *testing.T) {
 			return
 		}
 
-		updateResult, err := service.Update(ctx, sampleTodo.ID, "complete")
+		updateResult, err := store.Update(ctx, sampleTodo.ID, "complete")
 
 		if err != nil {
 			t.Errorf("todo not updated: %s", err.Error())
@@ -76,11 +75,11 @@ func TestCrud(t *testing.T) {
 
 		if updateResult.CreatedDate.After(updateResult.UpdatedDate) {
 			t.Errorf("got updated_date:%s, want after:%s",
-        updateResult.UpdatedDate.Format(time.RFC3339),
-        updateResult.CreatedDate.Format(time.RFC3339))
-      return
-    }
+				updateResult.UpdatedDate.Format(time.RFC3339),
+				updateResult.CreatedDate.Format(time.RFC3339))
+			return
+		}
 
-    service.Del(ctx, updateResult.ID)
+		store.Del(ctx, updateResult.ID)
 	})
 }

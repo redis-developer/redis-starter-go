@@ -67,7 +67,7 @@ func NewServer(config Config) *Server {
 		return c.NoContent(http.StatusNotFound)
 	})
 
-	todos.NewComponent(apiGroup.Group("/todos"), database)
+	todos.NewRouter(apiGroup.Group("/todos"), todos.NewStore(database))
 
 	return server
 }

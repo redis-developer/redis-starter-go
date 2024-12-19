@@ -11,7 +11,7 @@ run: build
 	./bin/app
 
 test: install
-	go test pkg/todos/main_test.go pkg/todos/main.go pkg/todos/service.go pkg/todos/repository.go pkg/todos/router.go -v
+	go test pkg/todos/store_test.go pkg/todos/store.go -v
 
 docker:
 	docker compose up -d
