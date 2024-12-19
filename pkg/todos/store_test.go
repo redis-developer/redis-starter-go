@@ -3,6 +3,8 @@ package todos
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -24,6 +26,7 @@ func TestCrud(t *testing.T) {
 	store := NewStore(database)
 	ctx := context.Background()
 	store.CreateIndexIfNotExists(ctx)
+	store.DelAll(ctx)
 
 	t.Cleanup(func() {
 		store.DelAll(ctx)
@@ -81,5 +84,41 @@ func TestCrud(t *testing.T) {
 		}
 
 		store.Del(ctx, updateResult.ID)
+	})
+
+	t.Run("Create and read multiple todos", func(t *testing.T) {
+		todos := []string{
+			"Take out the trash",
+			"Vacuum downstairs",
+			"Fold the laundry",
+		}
+
+		for idx, todo := range todos {
+			_, err := store.Create(ctx, strconv.Itoa(idx), todo)
+
+			if err != nil {
+				t.Errorf("error creating todo: %s", err.Error())
+				return
+			}
+		}
+
+		allTodos, err := store.All(ctx)
+
+		if err != nil {
+			t.Errorf("error getting all todos: %s", err.Error())
+			return
+		}
+
+		if len(allTodos.Documents) != int(allTodos.Total) || len(allTodos.Documents) != len(todos) {
+			t.Errorf("got len(Documents):%d total:%d, want len:%d", len(allTodos.Documents), allTodos.Total, len(todos))
+			return
+		}
+
+		for idx, todo := range allTodos.Documents {
+			if !slices.Contains(todos, todo.Name) {
+				t.Errorf("allTodos[%d].Name:%s not found in todos", idx, todo.Name)
+				return
+			}
+		}
 	})
 }
