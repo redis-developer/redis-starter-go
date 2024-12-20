@@ -12,7 +12,7 @@ func getEnv(key, fallback string) string {
 }
 
 func (c *Config) REDIS_URL() string {
-  return getEnv("REDIS_URL", "redis://localhost:6379")
+	return getEnv("REDIS_URL", "redis://localhost:6379")
 }
 
 func (c *Config) PORT() string {
