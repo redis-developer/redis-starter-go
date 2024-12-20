@@ -8,7 +8,6 @@ This is a [Redis](https://redis.io/) starter template for Go:
 Copy and edit the `.env` file:
 
 ```bash
-cp .env.example .env.docker
 cp .env.example .env
 ```
 
