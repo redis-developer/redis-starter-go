@@ -2,7 +2,6 @@ package todos
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	"github.com/redis-developer/redis-starter-go/cmd/config"
@@ -38,6 +37,8 @@ func TestCrud(t *testing.T) {
 		}
 		todo, err := store.Create(ctx, sampleTodo.ID, sampleTodo.Name)
 
+		sampleTodo.ID = todo.ID
+
 		if assert.NoErrorf(t, err, "todo not created: %s", "formatted") {
 			todosEqual(t, sampleTodo, todo)
 		}
@@ -67,8 +68,8 @@ func TestCrud(t *testing.T) {
 			"Fold the laundry",
 		}
 
-		for idx, todo := range todos {
-			_, err := store.Create(ctx, strconv.Itoa(idx), todo)
+		for _, todo := range todos {
+			_, err := store.Create(ctx, "", todo)
 
 			assert.NoErrorf(t, err, "error creating todo: %s", "formatted")
 		}

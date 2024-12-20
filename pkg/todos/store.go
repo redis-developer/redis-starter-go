@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -228,6 +229,11 @@ func (c TodoStore) Create(
 	id string,
 	name string) (*Todo, error) {
 	now := time.Now()
+
+	if len(id) == 0 {
+		id = uuid.New().String()
+	}
+
 	fId, err := formatId(id)
 
 	if err != nil {
