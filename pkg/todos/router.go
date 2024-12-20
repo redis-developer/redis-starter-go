@@ -1,3 +1,7 @@
+/*
+Package todos provides a component API for all the CRUD operations around building a
+todo list.
+*/
 package todos
 
 import (
@@ -7,11 +11,23 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type Router struct {
-	store TodoStore
+// Router provides the methods necessary for facilitating CRUD using an echo API
+type Router interface {
+	All(ctx echo.Context) error
+	Search(ctx echo.Context) error
+	One(ctx echo.Context) error
+	Create(ctx echo.Context) error
+	Update(ctx echo.Context) error
+	Del(ctx echo.Context) error
 }
 
-func (c Router) All(ctx echo.Context) error {
+// Implements a Router with a provided Store
+type TodoRouter struct {
+	store Store
+}
+
+// All handles the route for getting all Todos
+func (c TodoRouter) All(ctx echo.Context) error {
 	rCtx := ctx.Request().Context()
 
 	todos, err := c.store.All(rCtx)
@@ -24,7 +40,8 @@ func (c Router) All(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, todos)
 }
 
-func (c Router) Search(ctx echo.Context) error {
+// Search handles the route for searching all Todos
+func (c TodoRouter) Search(ctx echo.Context) error {
 	rCtx := ctx.Request().Context()
 	name := ctx.QueryParam("name")
 	status := ctx.QueryParam("status")
@@ -38,7 +55,8 @@ func (c Router) Search(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, todos)
 }
 
-func (c Router) One(ctx echo.Context) error {
+// One handles the route for getting a single Todo
+func (c TodoRouter) One(ctx echo.Context) error {
 	rCtx := ctx.Request().Context()
 	id := ctx.Param("id")
 	todo, err := c.store.One(rCtx, id)
@@ -51,12 +69,14 @@ func (c Router) One(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, todo)
 }
 
+// CreateTodoDTO handles parsing JSON requests for creating Todos
 type CreateTodoDTO struct {
 	ID   string `json:"id" form:"id"`
 	Name string `json:"name" form:"name"`
 }
 
-func (c Router) Create(ctx echo.Context) error {
+// Create handles the route for creating a Todo
+func (c TodoRouter) Create(ctx echo.Context) error {
 	t := new(CreateTodoDTO)
 
 	if err := ctx.Bind(t); err != nil {
@@ -75,11 +95,13 @@ func (c Router) Create(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, todo)
 }
 
+// UpdateTodoDTO handles parsing JSON requests for updating Todos
 type UpdateTodoDTO struct {
 	Status string `json:"status" form:"status"`
 }
 
-func (c Router) Update(ctx echo.Context) error {
+// Update handles the route for updating a Todo
+func (c TodoRouter) Update(ctx echo.Context) error {
 	t := new(UpdateTodoDTO)
 
 	if err := ctx.Bind(t); err != nil {
@@ -99,7 +121,8 @@ func (c Router) Update(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, todo)
 }
 
-func (c Router) Del(ctx echo.Context) error {
+// Del handles the route for deleting a Todo
+func (c TodoRouter) Del(ctx echo.Context) error {
 	rCtx := ctx.Request().Context()
 	id := ctx.Param("id")
 
@@ -113,8 +136,10 @@ func (c Router) Del(ctx echo.Context) error {
 	return ctx.String(http.StatusOK, "ok")
 }
 
-func NewRouter(g *echo.Group, store TodoStore) *Router {
-	router := &Router{store: store}
+// NewRouter returns a Router that uses the passed in echo group and Store
+// to create an API for Todo CRUD
+func NewRouter(g *echo.Group, store Store) Router {
+	router := &TodoRouter{store: store}
 
 	g.GET("", router.All)
 	g.GET("/:id", router.One)

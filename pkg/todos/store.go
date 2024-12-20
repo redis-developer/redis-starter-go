@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"regexp"
 	"slices"
 	"strings"
@@ -13,23 +12,30 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const TodosIndex = "todos-idx"
-const TodosPrefix = "todos:"
+// The redis index name for Todos
+const TodoIndex = "todos-idx"
 
+// The key prefix for Todos stored in redis
+const TodoPrefix = "todos:"
+
+// Enumerator for all the status types a Todo can have
 type TodoStatus string
 
+// A Todo has one of these status values
 const (
 	NotStarted TodoStatus = "todo"
 	InProgress TodoStatus = "in progress"
 	Complete   TodoStatus = "complete"
 )
 
+// Maps a string to its corresponding TodoStatus
 var TodoStatusMap = map[string]TodoStatus{
 	"todo":        NotStarted,
 	"in progress": InProgress,
 	"complete":    Complete,
 }
 
+// A Todo is the base model used to store the name and status of Todos
 type Todo struct {
 	ID     string     `json:"id"`
 	Name   string     `json:"name"`
@@ -39,12 +45,15 @@ type Todo struct {
 	UpdatedDate time.Time `json:"updated_date"`
 }
 
+// A Todos object is the result of list-based operations against redis
 type Todos struct {
 	Total     int64  `json:"total"`
 	Documents []Todo `json:"documents"`
 }
 
-type TodoStore interface {
+// Store provides the methods necessary to handle CRUD operations for Todos.
+// It also handles creating the index for searching Todos.
+type Store interface {
 	CreateIndexIfNotExists(ctx context.Context) error
 	DropIndex(ctx context.Context)
 	All(ctx context.Context) (*Todos, error)
@@ -56,28 +65,24 @@ type TodoStore interface {
 	DelAll(ctx context.Context) error
 }
 
-type store struct {
+// Implements a Store with a provided redis client
+type TodoStore struct {
 	db *redis.Client
 }
 
-func (c store) haveIndex(ctx context.Context) bool {
-	indexes := c.db.FT_List(ctx)
-
-	indexes.Val()
-
-	return slices.Contains(indexes.Val(), TodosIndex)
-}
-
-func parseTodoStr(id string, todoStr string) Todo {
+// parseTodoStr returns a Todo object based on the input JSON string
+func parseTodoStr(id string, todoJson string) Todo {
 	todo := Todo{ID: id}
 
-	json.Unmarshal([]byte(todoStr), &todo)
+	json.Unmarshal([]byte(todoJson), &todo)
 
 	return todo
 }
 
+// formatId returns a normalized ID string that allows IDs to either
+// include or exclude the TodosPrefix
 func formatId(id string) (string, error) {
-	matched, err := regexp.Match(`^todos:`, []byte(id))
+	matched, err := regexp.Match(`^`+TodoPrefix, []byte(id))
 
 	if err != nil {
 		return id, fmt.Errorf("failed to format id: %w", err)
@@ -87,20 +92,30 @@ func formatId(id string) (string, error) {
 		return id, err
 	}
 
-	return fmt.Sprintf("todos:%s", id), err
+	return fmt.Sprintf("%s%s", TodoPrefix, id), err
 }
 
-func (c store) CreateIndexIfNotExists(ctx context.Context) error {
+// haveIndex returns whether or not the Todo index already exists in redis
+func (c TodoStore) haveIndex(ctx context.Context) bool {
+	indexes := c.db.FT_List(ctx)
+
+	indexes.Val()
+
+	return slices.Contains(indexes.Val(), TodoIndex)
+}
+
+// CreateIndexIfNotExists ensures that the Todos index exists in redis
+func (c TodoStore) CreateIndexIfNotExists(ctx context.Context) error {
 	if c.haveIndex(ctx) {
 		return nil
 	}
 
 	_, err := c.db.FTCreate(
 		ctx,
-		TodosIndex,
+		TodoIndex,
 		&redis.FTCreateOptions{
 			OnJSON: true,
-			Prefix: []interface{}{TodosPrefix},
+			Prefix: []interface{}{TodoPrefix},
 		},
 		&redis.FieldSchema{
 			FieldName: "$.name",
@@ -121,16 +136,18 @@ func (c store) CreateIndexIfNotExists(ctx context.Context) error {
 	return err
 }
 
-func (c store) DropIndex(ctx context.Context) {
+// DropIndex will delete the Todos index in redis
+func (c TodoStore) DropIndex(ctx context.Context) {
 	if !c.haveIndex(ctx) {
 		return
 	}
 
-	c.db.FTDropIndex(ctx, TodosIndex)
+	c.db.FTDropIndex(ctx, TodoIndex)
 }
 
-func (c store) All(ctx context.Context) (*Todos, error) {
-	todosResult, err := c.db.FTSearch(ctx, TodosIndex, "*").Result()
+// All returns a Todos object that contains all existing Todos in redis
+func (c TodoStore) All(ctx context.Context) (*Todos, error) {
+	todosResult, err := c.db.FTSearch(ctx, TodoIndex, "*").Result()
 
 	var documents = []Todo{}
 
@@ -144,7 +161,8 @@ func (c store) All(ctx context.Context) (*Todos, error) {
 	}, err
 }
 
-func (c store) One(ctx context.Context, id string) (*Todo, error) {
+// One returns a Todo if it exists in redis based on the input id
+func (c TodoStore) One(ctx context.Context, id string) (*Todo, error) {
 	fId, err := formatId(id)
 
 	if err != nil {
@@ -157,19 +175,22 @@ func (c store) One(ctx context.Context, id string) (*Todo, error) {
 		return nil, fmt.Errorf("failed JSON.GET for todo: %w", err)
 	}
 
+	if len(todoStr) == 0 {
+		return nil, fmt.Errorf("todo not found")
+	}
+
 	todo := parseTodoStr(fId, todoStr)
 
 	return &todo, err
 }
 
-func (c store) Search(
+// Search returns a Todos object with a list of Todos that match the
+// input paramters (name and/or status)
+func (c TodoStore) Search(
 	ctx context.Context,
 	name string,
 	status string) (*Todos, error) {
 	var searches []string
-
-	log.Println(name)
-	log.Println(status)
 
 	if len(name) > 0 {
 		searches = append(searches, fmt.Sprintf("@name:%s", name))
@@ -179,11 +200,9 @@ func (c store) Search(
 		searches = append(searches, fmt.Sprintf("@status:%s", status))
 	}
 
-	log.Println(searches)
-
 	todosResult, err := c.db.FTSearch(
 		ctx,
-		TodosIndex,
+		TodoIndex,
 		strings.Join(searches, " "),
 	).Result()
 
@@ -203,7 +222,8 @@ func (c store) Search(
 	}, err
 }
 
-func (c store) Create(
+// Create returns a newly created Todo from redis based on the input ID and name
+func (c TodoStore) Create(
 	ctx context.Context,
 	id string,
 	name string) (*Todo, error) {
@@ -231,7 +251,8 @@ func (c store) Create(
 	return todo, nil
 }
 
-func (c store) Update(
+// Update returns an updated Todo from redis based on the ID with a new status
+func (c TodoStore) Update(
 	ctx context.Context,
 	id string,
 	status string) (*Todo, error) {
@@ -265,7 +286,8 @@ func (c store) Update(
 	return todo, nil
 }
 
-func (c store) Del(ctx context.Context, id string) error {
+// Del deletes a todo in redis if it exists
+func (c TodoStore) Del(ctx context.Context, id string) error {
 	fId, err := formatId(id)
 
 	if err != nil {
@@ -277,7 +299,8 @@ func (c store) Del(ctx context.Context, id string) error {
 	return err
 }
 
-func (c store) DelAll(ctx context.Context) error {
+// DelAll deletes all the Todos in redis
+func (c TodoStore) DelAll(ctx context.Context) error {
 	allTodos, err := c.All(ctx)
 
 	if err != nil {
@@ -295,12 +318,14 @@ func (c store) DelAll(ctx context.Context) error {
 	return nil
 }
 
-func NewStore(db *redis.Client) *store {
-	repository := &store{
+// NewStore returns a Store that uses the passed-in redis client
+// to manage Todos
+func NewStore(db *redis.Client) Store {
+	store := &TodoStore{
 		db: db,
 	}
 
-	repository.CreateIndexIfNotExists(context.Background())
+	store.CreateIndexIfNotExists(context.Background())
 
-	return repository
+	return store
 }
