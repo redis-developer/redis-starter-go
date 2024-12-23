@@ -24,13 +24,12 @@ func TestCrud(t *testing.T) {
 	store.DelAll(ctx)
 
 	t.Cleanup(func() {
-		// store.DelAll(ctx)
-		// store.DropIndex(ctx)
+		store.DelAll(ctx)
+		store.DropIndex(ctx)
 		store.CreateIndexIfNotExists(ctx)
 	})
 
 	t.Run("CRUD for a single todo", func(t *testing.T) {
-		t.Skip()
 		sampleTodo := &TodoDocument{
 			ID: "todos:abc123",
 			Value: Todo{
