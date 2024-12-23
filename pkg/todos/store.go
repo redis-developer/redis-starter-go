@@ -45,6 +45,7 @@ type Todo struct {
 	UpdatedDate time.Time `json:"updated_date"`
 }
 
+// A TodoDocument contains the Todo's ID in Redis as well as the Todo value
 type TodoDocument struct {
 	ID    string `json:"id"`
 	Value Todo   `json:"value"`
