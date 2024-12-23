@@ -76,6 +76,32 @@ type TodoStore struct {
 	db *redis.Client
 }
 
+// Enumerator for the types of internal errors thrown
+type TodoErrorType string
+
+// A TodoError has one of these types
+const (
+	NotFound TodoErrorType = "not found"
+	Invalid  TodoErrorType = "invalid"
+	Unknown  TodoErrorType = "unknown"
+)
+
+// A TodoError is a Redis-level error with a safe message for the client
+type TodoError struct {
+	ErrorType     TodoErrorType
+	ClientMessage string
+	Err           error
+}
+
+// Error is implemented to make a TodoError operate as a go error
+func (c *TodoError) Error() string {
+	if c.Err == nil {
+		return c.ClientMessage
+	}
+
+	return c.Err.Error()
+}
+
 // parseTodoStr returns a Todo object based on the input JSON string
 func parseTodoStr(todoJson string) Todo {
 	todo := Todo{}
@@ -87,18 +113,19 @@ func parseTodoStr(todoJson string) Todo {
 
 // formatId returns a normalized ID string that allows IDs to either
 // include or exclude the TodosPrefix
-func formatId(id string) (string, error) {
+func formatId(id string) string {
 	matched, err := regexp.Match(`^`+TodoPrefix, []byte(id))
 
 	if err != nil {
-		return id, fmt.Errorf("failed to format id: %w", err)
+		// This should not happen, if it does that is bad
+		panic(err)
 	}
 
 	if matched {
-		return id, err
+		return id
 	}
 
-	return fmt.Sprintf("%s%s", TodoPrefix, id), err
+	return fmt.Sprintf("%s%s", TodoPrefix, id)
 }
 
 // haveIndex returns whether or not the Todo index already exists in redis
@@ -134,7 +161,11 @@ func (c TodoStore) CreateIndexIfNotExists(ctx context.Context) error {
 	).Result()
 
 	if err != nil {
-		return fmt.Errorf("failed to create index: %w", err)
+		return &TodoError{
+			ErrorType:     Unknown,
+			ClientMessage: "failed to create index",
+			Err:           fmt.Errorf("failed to create index: %w", err),
+		}
 	}
 
 	return err
@@ -152,6 +183,14 @@ func (c TodoStore) DropIndex(ctx context.Context) {
 // All returns a Todos object that contains all existing Todos in redis
 func (c TodoStore) All(ctx context.Context) (*Todos, error) {
 	todosResult, err := c.db.FTSearch(ctx, TodoIndex, "*").Result()
+
+	if err != nil {
+		return nil, &TodoError{
+			ErrorType:     Unknown,
+			ClientMessage: "failed to get all todos",
+			Err:           fmt.Errorf("failed to get all todos: %w", err),
+		}
+	}
 
 	var documents = []TodoDocument{}
 
@@ -171,20 +210,24 @@ func (c TodoStore) All(ctx context.Context) (*Todos, error) {
 
 // One returns a Todo if it exists in redis based on the input id
 func (c TodoStore) One(ctx context.Context, id string) (*Todo, error) {
-	fId, err := formatId(id)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get normalized id: %w", err)
-	}
+	fId := formatId(id)
 
 	todoStr, err := c.db.JSONGet(ctx, fId).Result()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed JSON.GET for todo: %w", err)
+		return nil, &TodoError{
+			ErrorType:     Unknown,
+			ClientMessage: "failed to get todo",
+			Err:           fmt.Errorf("failed to get todo: %w", err),
+		}
 	}
 
 	if len(todoStr) == 0 {
-		return nil, fmt.Errorf("todo not found")
+		return nil, &TodoError{
+			ErrorType:     NotFound,
+			ClientMessage: "todo not found",
+			Err:           err,
+		}
 	}
 
 	todo := parseTodoStr(todoStr)
@@ -215,7 +258,11 @@ func (c TodoStore) Search(
 	).Result()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed FT.SEARCH for todos: %w", err)
+		return nil, &TodoError{
+			ErrorType:     Unknown,
+			ClientMessage: "failed search for todos",
+			Err:           fmt.Errorf("failed to search for todos: %w", err),
+		}
 	}
 
 	var documents = []TodoDocument{}
@@ -245,11 +292,15 @@ func (c TodoStore) Create(
 		id = uuid.New().String()
 	}
 
-	fId, err := formatId(id)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get normalized id: %w", err)
+	if len(name) == 0 {
+		return nil, &TodoError{
+			ErrorType:     Invalid,
+			ClientMessage: "todo must have a name",
+			Err:           nil,
+		}
 	}
+
+	fId := formatId(id)
 
 	todo := &TodoDocument{
 		ID: fId,
@@ -261,10 +312,14 @@ func (c TodoStore) Create(
 		},
 	}
 
-	_, err = c.db.JSONSet(ctx, fId, "$", todo.Value).Result()
+	_, err := c.db.JSONSet(ctx, fId, "$", todo.Value).Result()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed JSON.SET for todo: %w", err)
+		return nil, &TodoError{
+			ErrorType:     Invalid,
+			ClientMessage: "failed to update todo",
+			Err:           err,
+		}
 	}
 
 	return todo, nil
@@ -275,22 +330,26 @@ func (c TodoStore) Update(
 	ctx context.Context,
 	id string,
 	status string) (*Todo, error) {
-	fId, err := formatId(id)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get normalized id: %w", err)
-	}
+	fId := formatId(id)
 
 	todoStatus, ok := TodoStatusMap[status]
 
 	if !ok {
-		return nil, fmt.Errorf("invalid status %s", todoStatus)
+		return nil, &TodoError{
+			ErrorType:     Invalid,
+			ClientMessage: fmt.Sprintf("invalid status %s", todoStatus),
+			Err:           nil,
+		}
 	}
 
 	todo, err := c.One(ctx, fId)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to update todo, not found: %w", err)
+		return nil, &TodoError{
+			ErrorType:     NotFound,
+			ClientMessage: "todo not found",
+			Err:           err,
+		}
 	}
 
 	todo.Status = todoStatus
@@ -299,7 +358,11 @@ func (c TodoStore) Update(
 	_, err = c.db.JSONSet(ctx, fId, "$", todo).Result()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed JSON.SET for todo: %w", err)
+		return nil, &TodoError{
+			ErrorType:     Unknown,
+			ClientMessage: "failed to update todo",
+			Err:           fmt.Errorf("failed to update todo: %w", err),
+		}
 	}
 
 	return todo, nil
@@ -307,15 +370,19 @@ func (c TodoStore) Update(
 
 // Del deletes a todo in redis if it exists
 func (c TodoStore) Del(ctx context.Context, id string) error {
-	fId, err := formatId(id)
+	fId := formatId(id)
+
+	_, err := c.db.JSONDel(ctx, fId, "$").Result()
 
 	if err != nil {
-		return fmt.Errorf("failed to get normalized id: %w", err)
+		return &TodoError{
+			ErrorType:     Unknown,
+			ClientMessage: "failed to delete todo",
+			Err:           fmt.Errorf("failed to delete todo: %w", err),
+		}
 	}
 
-	_, err = c.db.JSONDel(ctx, fId, "$").Result()
-
-	return err
+	return nil
 }
 
 // DelAll deletes all the Todos in redis
@@ -323,14 +390,22 @@ func (c TodoStore) DelAll(ctx context.Context) error {
 	allTodos, err := c.All(ctx)
 
 	if err != nil {
-		return fmt.Errorf("failed to find all todos: %w", err)
+		return &TodoError{
+			ErrorType:     Unknown,
+			ClientMessage: "failed to find all todos",
+			Err:           fmt.Errorf("failed to find all todos: %w", err),
+		}
 	}
 
 	for _, todo := range allTodos.Documents {
 		err = c.Del(ctx, todo.ID)
 
 		if err != nil {
-			return fmt.Errorf("failed to delete todo: %w", err)
+			return &TodoError{
+				ErrorType:     Unknown,
+				ClientMessage: "failed to delete todo",
+				Err:           fmt.Errorf("failed to delete todo: %w", err),
+			}
 		}
 	}
 
@@ -339,7 +414,7 @@ func (c TodoStore) DelAll(ctx context.Context) error {
 
 // NewStore returns a Store that uses the passed-in redis client
 // to manage Todos
-func NewStore(db *redis.Client) Store {
+func NewStore(db *redis.Client) *TodoStore {
 	store := &TodoStore{
 		db: db,
 	}

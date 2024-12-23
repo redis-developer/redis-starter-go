@@ -41,13 +41,13 @@ func TestCrud(t *testing.T) {
 
 		sampleTodo.ID = todo.ID
 
-		if assert.NoErrorf(t, err, "todo not created: %s", "formatted") {
+		if assert.NoErrorf(t, err, "todo not created") {
 			todosEqual(t, sampleTodo, todo)
 		}
 
 		readResult, err := store.One(ctx, todo.ID)
 
-		if assert.NoErrorf(t, err, "todo not read: %s", "formatted") {
+		if assert.NoErrorf(t, err, "todo not read") {
 			todosEqual(t, todo, &TodoDocument{
 				ID:    todo.ID,
 				Value: *readResult,
@@ -56,14 +56,14 @@ func TestCrud(t *testing.T) {
 
 		updateResult, err := store.Update(ctx, sampleTodo.ID, "complete")
 
-		if assert.NoErrorf(t, err, "todo not updated: %s", "formatted") {
+		if assert.NoErrorf(t, err, "todo not updated") {
 			assert.Equal(t, Complete, updateResult.Status)
 			assert.True(t, updateResult.CreatedDate.Before(updateResult.UpdatedDate))
 		}
 
 		err = store.Del(ctx, sampleTodo.ID)
 
-		assert.NoErrorf(t, err, "todo not deleted: %s", "formatted")
+		assert.NoErrorf(t, err, "todo not deleted")
 	})
 
 	t.Run("Create and read multiple todos", func(t *testing.T) {
@@ -76,12 +76,12 @@ func TestCrud(t *testing.T) {
 		for _, todo := range todos {
 			_, err := store.Create(ctx, "", todo)
 
-			assert.NoErrorf(t, err, "error creating todo: %s", "formatted")
+			assert.NoErrorf(t, err, "error creating todo")
 		}
 
 		allTodos, err := store.All(ctx)
 
-		if assert.NoErrorf(t, err, "error getting all todos: %s", "formatted") {
+		if assert.NoErrorf(t, err, "error getting all todos") {
 			assert.Equal(t, len(todos), len(allTodos.Documents))
 			assert.True(t, len(allTodos.Documents) == int(allTodos.Total))
 		}

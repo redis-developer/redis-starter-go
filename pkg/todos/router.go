@@ -5,6 +5,7 @@ todo list.
 package todos
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -26,6 +27,22 @@ type TodoRouter struct {
 	store Store
 }
 
+func (c TodoRouter) handleError(err error) *echo.HTTPError {
+	var todoError *TodoError
+
+	if errors.As(err, &todoError) {
+		if todoError.ErrorType == Unknown {
+			return echo.NewHTTPError(http.StatusInternalServerError, todoError.ClientMessage)
+		} else if todoError.ErrorType == NotFound {
+			return echo.NewHTTPError(http.StatusNotFound, todoError.ClientMessage)
+		} else if todoError.ErrorType == Invalid {
+			return echo.NewHTTPError(http.StatusBadRequest, todoError.ClientMessage)
+		}
+	}
+
+	return echo.ErrInternalServerError
+}
+
 // All handles the route for getting all Todos
 func (c TodoRouter) All(ctx echo.Context) error {
 	rCtx := ctx.Request().Context()
@@ -34,22 +51,8 @@ func (c TodoRouter) All(ctx echo.Context) error {
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusNotFound, "not found")
-	}
 
-	return ctx.JSON(http.StatusOK, todos)
-}
-
-// Search handles the route for searching all Todos
-func (c TodoRouter) Search(ctx echo.Context) error {
-	rCtx := ctx.Request().Context()
-	name := ctx.QueryParam("name")
-	status := ctx.QueryParam("status")
-	todos, err := c.store.Search(rCtx, name, status)
-
-	if err != nil {
-		slog.Debug(err.Error())
-		return ctx.String(http.StatusNotFound, "not found")
+		return c.handleError(err)
 	}
 
 	return ctx.JSON(http.StatusOK, todos)
@@ -63,10 +66,27 @@ func (c TodoRouter) One(ctx echo.Context) error {
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusNotFound, "not found")
+
+		return c.handleError(err)
 	}
 
 	return ctx.JSON(http.StatusOK, todo)
+}
+
+// Search handles the route for searching all Todos
+func (c TodoRouter) Search(ctx echo.Context) error {
+	rCtx := ctx.Request().Context()
+	name := ctx.QueryParam("name")
+	status := ctx.QueryParam("status")
+	todos, err := c.store.Search(rCtx, name, status)
+
+	if err != nil {
+		slog.Debug(err.Error())
+
+		return c.handleError(err)
+	}
+
+	return ctx.JSON(http.StatusOK, todos)
 }
 
 // CreateTodoDTO handles parsing JSON requests for creating Todos
@@ -81,7 +101,8 @@ func (c TodoRouter) Create(ctx echo.Context) error {
 
 	if err := ctx.Bind(t); err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusBadRequest, "bad request")
+
+		return c.handleError(err)
 	}
 
 	rCtx := ctx.Request().Context()
@@ -89,7 +110,8 @@ func (c TodoRouter) Create(ctx echo.Context) error {
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusBadRequest, "bad request, todo not created")
+
+		return c.handleError(err)
 	}
 
 	return ctx.JSON(http.StatusOK, todo)
@@ -106,7 +128,8 @@ func (c TodoRouter) Update(ctx echo.Context) error {
 
 	if err := ctx.Bind(t); err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusBadRequest, "bad request")
+
+		return c.handleError(err)
 	}
 
 	rCtx := ctx.Request().Context()
@@ -115,7 +138,8 @@ func (c TodoRouter) Update(ctx echo.Context) error {
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusNotFound, "not found")
+
+		return c.handleError(err)
 	}
 
 	return ctx.JSON(http.StatusOK, todo)
@@ -130,7 +154,8 @@ func (c TodoRouter) Del(ctx echo.Context) error {
 
 	if err != nil {
 		slog.Debug(err.Error())
-		return ctx.String(http.StatusBadRequest, "not found")
+
+		return c.handleError(err)
 	}
 
 	return ctx.String(http.StatusOK, "ok")
@@ -138,7 +163,7 @@ func (c TodoRouter) Del(ctx echo.Context) error {
 
 // NewRouter returns a Router that uses the passed in echo group and Store
 // to create an API for Todo CRUD
-func NewRouter(g *echo.Group, store Store) Router {
+func NewRouter(g *echo.Group, store Store) *TodoRouter {
 	router := &TodoRouter{store: store}
 
 	g.GET("", router.All)
@@ -148,8 +173,8 @@ func NewRouter(g *echo.Group, store Store) Router {
 	g.PATCH("/:id", router.Update)
 	g.DELETE("/:id", router.Del)
 
-	g.RouteNotFound("/*", func(c echo.Context) error {
-		return c.NoContent(http.StatusNotFound)
+	g.RouteNotFound("/*", func(ctx echo.Context) error {
+		return ctx.NoContent(http.StatusNotFound)
 	})
 
 	return router
