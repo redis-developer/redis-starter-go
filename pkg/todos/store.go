@@ -38,7 +38,6 @@ var TodoStatusMap = map[string]TodoStatus{
 
 // A Todo is the base model used to store the name and status of Todos
 type Todo struct {
-	ID     string     `json:"id"`
 	Name   string     `json:"name"`
 	Status TodoStatus `json:"status"`
 
@@ -46,10 +45,15 @@ type Todo struct {
 	UpdatedDate time.Time `json:"updated_date"`
 }
 
+type TodoDocument struct {
+	ID    string `json:"id"`
+	Value Todo   `json:"value"`
+}
+
 // A Todos object is the result of list-based operations against redis
 type Todos struct {
-	Total     int64  `json:"total"`
-	Documents []Todo `json:"documents"`
+	Total     int64          `json:"total"`
+	Documents []TodoDocument `json:"documents"`
 }
 
 // Store provides the methods necessary to handle CRUD operations for Todos.
@@ -60,7 +64,7 @@ type Store interface {
 	All(ctx context.Context) (*Todos, error)
 	One(ctx context.Context, id string) (*Todo, error)
 	Search(ctx context.Context, name string, status string) (*Todos, error)
-	Create(ctx context.Context, id string, name string) (*Todo, error)
+	Create(ctx context.Context, id string, name string) (*TodoDocument, error)
 	Update(ctx context.Context, id string, status string) (*Todo, error)
 	Del(ctx context.Context, id string) error
 	DelAll(ctx context.Context) error
@@ -72,8 +76,8 @@ type TodoStore struct {
 }
 
 // parseTodoStr returns a Todo object based on the input JSON string
-func parseTodoStr(id string, todoJson string) Todo {
-	todo := Todo{ID: id}
+func parseTodoStr(todoJson string) Todo {
+	todo := Todo{}
 
 	json.Unmarshal([]byte(todoJson), &todo)
 
@@ -99,8 +103,6 @@ func formatId(id string) (string, error) {
 // haveIndex returns whether or not the Todo index already exists in redis
 func (c TodoStore) haveIndex(ctx context.Context) bool {
 	indexes := c.db.FT_List(ctx)
-
-	indexes.Val()
 
 	return slices.Contains(indexes.Val(), TodoIndex)
 }
@@ -150,10 +152,14 @@ func (c TodoStore) DropIndex(ctx context.Context) {
 func (c TodoStore) All(ctx context.Context) (*Todos, error) {
 	todosResult, err := c.db.FTSearch(ctx, TodoIndex, "*").Result()
 
-	var documents = []Todo{}
+	var documents = []TodoDocument{}
 
 	for _, todoDoc := range todosResult.Docs {
-		documents = append(documents, parseTodoStr(todoDoc.ID, todoDoc.Fields["$"]))
+		todo := parseTodoStr(todoDoc.Fields["$"])
+		documents = append(documents, TodoDocument{
+			ID:    todoDoc.ID,
+			Value: todo,
+		})
 	}
 
 	return &Todos{
@@ -180,7 +186,7 @@ func (c TodoStore) One(ctx context.Context, id string) (*Todo, error) {
 		return nil, fmt.Errorf("todo not found")
 	}
 
-	todo := parseTodoStr(fId, todoStr)
+	todo := parseTodoStr(todoStr)
 
 	return &todo, err
 }
@@ -211,10 +217,14 @@ func (c TodoStore) Search(
 		return nil, fmt.Errorf("failed FT.SEARCH for todos: %w", err)
 	}
 
-	var documents = []Todo{}
+	var documents = []TodoDocument{}
 
 	for _, todoDoc := range todosResult.Docs {
-		documents = append(documents, parseTodoStr(todoDoc.ID, todoDoc.Fields["$"]))
+		todo := parseTodoStr(todoDoc.Fields["$"])
+		documents = append(documents, TodoDocument{
+			ID:    todoDoc.ID,
+			Value: todo,
+		})
 	}
 
 	return &Todos{
@@ -227,7 +237,7 @@ func (c TodoStore) Search(
 func (c TodoStore) Create(
 	ctx context.Context,
 	id string,
-	name string) (*Todo, error) {
+	name string) (*TodoDocument, error) {
 	now := time.Now()
 
 	if len(id) == 0 {
@@ -240,15 +250,17 @@ func (c TodoStore) Create(
 		return nil, fmt.Errorf("failed to get normalized id: %w", err)
 	}
 
-	todo := &Todo{
-		ID:          fId,
-		Name:        name,
-		Status:      NotStarted,
-		CreatedDate: now,
-		UpdatedDate: now,
+	todo := &TodoDocument{
+		ID: fId,
+		Value: Todo{
+			Name:        name,
+			Status:      NotStarted,
+			CreatedDate: now,
+			UpdatedDate: now,
+		},
 	}
 
-	_, err = c.db.JSONSet(ctx, fId, "$", todo).Result()
+	_, err = c.db.JSONSet(ctx, fId, "$", todo.Value).Result()
 
 	if err != nil {
 		return nil, fmt.Errorf("failed JSON.SET for todo: %w", err)
