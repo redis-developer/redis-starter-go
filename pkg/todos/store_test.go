@@ -17,7 +17,7 @@ func todosEqual(t *testing.T, expected *TodoDocument, actual *TodoDocument) {
 
 func TestCrud(t *testing.T) {
 	cfg := config.Config{}
-	database := redis.GetClient(cfg.REDIS_URL())
+	database := redis.GetClient(cfg.RedisUrl())
 	store := NewStore(database)
 	ctx := context.Background()
 	store.CreateIndexIfNotExists(ctx)
