@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/redis-developer/redis-starter-go/pkg/redis"
+	"github.com/redis-developer/redis-starter-go/pkg/todos"
 )
 
 type Config interface {
@@ -19,6 +22,27 @@ type Config interface {
 type Server struct {
 	port string
 	e    *echo.Echo
+}
+
+func setupApi(config Config) *echo.Echo {
+	database := redis.GetClient(config.RedisUrl())
+
+	e := echo.New()
+	e.Pre(middleware.RemoveTrailingSlash())
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Format: "${time_rfc3339} ${status} ${method} ${uri} ${latency_human} " +
+			"[${user_agent} ${remote_ip}]\n",
+	}))
+	e.Use(middleware.Recover())
+
+	apiGroup := e.Group("/api")
+	apiGroup.RouteNotFound("/*", func(c echo.Context) error {
+		return c.NoContent(http.StatusNotFound)
+	})
+
+	todos.NewRouter(apiGroup.Group("/todos"), todos.NewStore(database))
+
+	return e
 }
 
 func (s *Server) Run() {
@@ -44,11 +68,8 @@ func (s *Server) Run() {
 }
 
 func New(config Config) *Server {
-  e := SetupApp(config)
-	server := &Server{
+	return &Server{
 		port: config.Port(),
-		e:    e,
+    e: setupApi(config),
 	}
-
-  return server
 }

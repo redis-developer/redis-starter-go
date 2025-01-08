@@ -39,11 +39,12 @@ func TestCrud(t *testing.T) {
 		}
 		todo, err := store.Create(ctx, sampleTodo.ID, sampleTodo.Value.Name)
 
-		sampleTodo.ID = todo.ID
-
 		if assert.NoErrorf(t, err, "todo not created") {
+		  sampleTodo.ID = todo.ID
 			todosEqual(t, sampleTodo, todo)
-		}
+		} else {
+      return
+    }
 
 		readResult, err := store.One(ctx, todo.ID)
 
@@ -52,14 +53,18 @@ func TestCrud(t *testing.T) {
 				ID:    todo.ID,
 				Value: *readResult,
 			})
-		}
+		} else {
+      return
+    }
 
 		updateResult, err := store.Update(ctx, sampleTodo.ID, "complete")
 
 		if assert.NoErrorf(t, err, "todo not updated") {
 			assert.Equal(t, Complete, updateResult.Status)
 			assert.True(t, updateResult.CreatedDate.Before(updateResult.UpdatedDate))
-		}
+		} else {
+      return
+    }
 
 		err = store.Del(ctx, sampleTodo.ID)
 
@@ -76,7 +81,9 @@ func TestCrud(t *testing.T) {
 		for _, todo := range todos {
 			_, err := store.Create(ctx, "", todo)
 
-			assert.NoErrorf(t, err, "error creating todo")
+			if !assert.NoErrorf(t, err, "error creating todo") {
+        return
+      }
 		}
 
 		allTodos, err := store.All(ctx)
@@ -84,7 +91,9 @@ func TestCrud(t *testing.T) {
 		if assert.NoErrorf(t, err, "error getting all todos") {
 			assert.Equal(t, len(todos), len(allTodos.Documents))
 			assert.True(t, len(allTodos.Documents) == int(allTodos.Total))
-		}
+		} else {
+      return
+    }
 
 		for _, todo := range allTodos.Documents {
 			assert.Contains(t, todos, todo.Value.Name)
