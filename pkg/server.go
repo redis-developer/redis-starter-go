@@ -10,8 +10,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/redis-developer/redis-starter-go/pkg/components/todos"
 	"github.com/redis-developer/redis-starter-go/pkg/redis"
-	"github.com/redis-developer/redis-starter-go/pkg/todos"
 )
 
 type Config interface {
@@ -70,6 +70,6 @@ func (s *Server) Run() {
 func New(config Config) *Server {
 	return &Server{
 		port: config.Port(),
-    e: setupApi(config),
+		e:    setupApi(config),
 	}
 }
