@@ -3,6 +3,13 @@ This is a [Redis](https://redis.io/) starter template for Go:
 - [Redis Cloud](https://redis.io/try-free/)
 - [Echo](https://echo.labstack.com/)
 
+## Requirements
+
+- [make](https://www.make.com/en)
+- [go>=1.22](https://go.dev/)
+- [docker](https://www.docker.com/)
+   - Optional
+
 ## Getting started
 
 Copy and edit the `.env` file:
