@@ -244,7 +244,7 @@ func (c TodoStore) Search(
 	var searches []string
 
 	if len(name) > 0 {
-		searches = append(searches, fmt.Sprintf("@name:%s", name))
+		searches = append(searches, fmt.Sprintf("@name:(%s)", name))
 	}
 
 	if len(status) > 0 {
@@ -317,7 +317,7 @@ func (c TodoStore) Create(
 	if err != nil {
 		return nil, &TodoError{
 			ErrorType:     Invalid,
-			ClientMessage: "failed to update todo",
+			ClientMessage: "failed to create todo",
 			Err:           err,
 		}
 	}
