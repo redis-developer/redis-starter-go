@@ -19,7 +19,7 @@ func getEnv(key, fallback string) string {
 }
 
 func (c *Config) Port() string {
-	return getEnv("PORT", "3000")
+	return getEnv("PORT", "8080")
 }
 
 func (c *Config) RedisUrl() string {
