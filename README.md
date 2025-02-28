@@ -33,12 +33,6 @@ Next, spin up docker containers:
 make docker
 ```
 
-or
-
-```bash
-docker compose up -d
-```
-
 You should have a server running on `http://localhost:<port>` where the port is set in your `.env` file (default is 8000). You can test the following routes:
 
 1. `GET /api/todos` - Gets all todos
@@ -56,10 +50,6 @@ There are some tests in the `pkg/todos/store_test.go` file that can be run with 
 make test
 ```
 
-```bash
-go mod tidy && go test pkg/todos/store_test.go pkg/todos/store.go -v
-```
-
 These tests setup and teardown on their own. You can modify them if you want to leave data in Redis.
 
 ## Running locally outside docker
@@ -70,25 +60,9 @@ To run the development server outside of docker:
 make dev
 ```
 
-or
-
-```bash
-go mod tidy && go run cmd/main.go
-```
-
 ## Other Scripts
 
-Building a binary:
-
-```bash
-make
-```
-
-or
-
-```bash
-go mod tidy && go build -o ./bin/app cmd/main.go
-```
+Run `make` to see the list of available commands.
 
 ## Connecting to Redis Cloud
 
