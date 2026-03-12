@@ -6,7 +6,7 @@ This is a [Redis](https://redis.io/) starter template for Go:
 ## Requirements
 
 - [make](https://www.make.com/en)
-- [go>=1.22](https://go.dev/)
+- [go>=1.26.1](https://go.dev/)
 - [docker](https://www.docker.com/)
    - Optional
 
@@ -19,11 +19,19 @@ cp .env.example .env
 ```
 
 Your `.env` file should contain the connection string you copied from Redis Cloud.
+The additional settings are optional:
+
+- `APP_ENV` defaults to `development` and also accepts `test` or `production`
+- `LOG_LEVEL` defaults to `info`
+- `LOG_STREAM_KEY` defaults to `logs`
+
+If `APP_ENV` is unset, `NODE_ENV` is accepted as a fallback alias.
 
 Your `.env.docker` file will look similar to `.env`, but should use the appropriate docker internal URLs. Here is
 an example:
 
 ```bash
+HOST_PORT=8081
 REDIS_URL="redis://redis:6379"
 ```
 
@@ -33,24 +41,28 @@ Next, spin up docker containers:
 make docker
 ```
 
-You should have a server running on `http://localhost:<port>` where the port is set in your `.env` file (default is 8080). You can test the following routes:
+You should have a server running on `http://localhost:<host-port>` where `HOST_PORT` comes from `.env.docker` (default is 8081). The app still listens on the internal `PORT` value (default 8080). You can test the following routes:
 
 1. `GET /api/todos` - Gets all todos
 2. `GET /api/todos/:id` - Gets a todo by ID
-3. `GET /api/todos?[name=<name>]&[status=<status>]` - Search for todos by name and/or status
+3. `GET /api/todos/search?[name=<name>]&[status=<status>]` - Search for todos by name and/or status
 4. `POST /api/todos` - Create a todo with `{ "name": "Sample todo" }`
 5. `PATCH /api/todos/:id` - Update todo by ID with `{ "status": "todo|in progress|complete" }`
 6. `DELETE /api/todos/:id` - Delete a todo by ID
 
 ## Running tests
 
-There are some tests in the `pkg/todos/store_test.go` file that can be run with the following command:
+There are unit and Docker-backed integration tests that can be run with the following command:
 
 ```bash
 make test
 ```
 
-These tests setup and teardown on their own. You can modify them if you want to leave data in Redis.
+These tests setup and teardown on their own with Testcontainers. If you want to skip the Docker-backed coverage, run:
+
+```bash
+make test-short
+```
 
 ## Running locally outside docker
 
@@ -62,7 +74,7 @@ make dev
 
 ## Other Scripts
 
-Run `make` to see the list of available commands.
+Run `make` to see the list of available commands. Application and request logs are written to stdout and also appended to the Redis stream named by `LOG_STREAM_KEY`.
 
 ## Connecting to Redis Cloud
 
